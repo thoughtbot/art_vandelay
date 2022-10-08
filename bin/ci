@@ -1,0 +1,22 @@
+#!/bin/sh
+
+green() { printf "\033[32m${1}\033[0m\n"; }
+red() { printf "\033[31m${1}\033[0m\n"; }
+
+set -e
+
+green "[bin/ci] Running linters..."
+if bundle exec standardrb
+then
+  green "[bin/ci] Running test suite..."
+  if bundle exec rails t --fail-fast
+  then
+    green "[bin/ci] CI Passed 🎉"
+  else
+    red "[bin/ci] Test suite failed. Exiting."
+    exit 1
+  fi
+else
+  red "[bin/ci] There were linting errors. Exiting."
+  exit 1
+fi
