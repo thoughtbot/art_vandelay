@@ -1,5 +1,6 @@
 require "art_vandelay/version"
 require "art_vandelay/engine"
+require "csv"
 
 module ArtVandelay
   mattr_accessor :filtered_attributes, :from_address, :in_batches_of
