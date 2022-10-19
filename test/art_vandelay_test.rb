@@ -175,6 +175,16 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "user-export-1989-12-31-00-00-00-UTC.csv", csv.filename
     end
 
+    test "it requires a from address" do
+      User.create!(email: "user@xample.com", password: "password")
+
+      assert_raises ArtVandelay::Error do
+        ArtVandelay::Export.new(User.all).email_csv(
+          to: ["recipient_1@examaple.com"]
+        )
+      end
+    end
+
     test "it emails a CSV when one record is passed" do
       travel_to Date.new(1989, 12, 31).beginning_of_day
       user = User.create!(email: "user@xample.com", password: "password")
