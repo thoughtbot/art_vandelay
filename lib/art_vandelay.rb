@@ -11,6 +11,9 @@ module ArtVandelay
     yield self
   end
 
+  class Error < StandardError
+  end
+
   class Export
     class Result
       attr_reader :csv_exports
@@ -43,6 +46,10 @@ module ArtVandelay
     end
 
     def email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
+      if from.nil?
+        raise ArtVandelay::Error, "missing keyword: :from. Alternatively, set a value on ArtVandelay.from_address"
+      end
+
       mailer = ActionMailer::Base.mail(to: to, from: from, subject: subject, body: body)
       csv_exports = csv.csv_exports
 
