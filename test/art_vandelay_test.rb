@@ -314,4 +314,157 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "CUSTOM BODY", email.body.raw_source
     end
   end
+
+  class Import < ArtVandelayTest
+    test "it imports data from a CSV string" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email password]
+        csv << %w[email_1@example.com s3krit]
+        csv << %w[email_2@example.com s3kure!]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).csv(csv_string)
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it sets the headers" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email_1@example.com s3krit]
+        csv << %w[email_2@example.com s3kure!]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).csv(csv_string, headers: [:email, :password])
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "maps to custom headers" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email_address passcode]
+        csv << %w[email_1@example.com s3krit]
+        csv << %w[email_2@example.com s3kure!]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it no-ops if one record fails to save" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email password]
+        csv << %w[valid@example.com s3kure!]
+        csv << %w[invalid@example.com]
+        csv << %w[valid@example.com s3kure!]
+      end
+
+      assert_no_difference("User.count") do
+        assert_raises ActiveRecord::RecordInvalid do
+          ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+        end
+      end
+    end
+
+    test "it saves other records if another fails to save" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email password]
+        csv << %w[valid_1@example.com s3kure!]
+        csv << %w[invalid@example.com]
+        csv << %w[valid_2@example.com s3kure!]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).csv(csv_string)
+      end
+    end
+
+    test "returns results" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email password]
+        csv << %w[valid_1@example.com s3krit]
+        csv << %w[invalid@example.com]
+        csv << %w[valid_2@example.com s3krit]
+      end
+
+      result = ArtVandelay::Import.new(:users).csv(csv_string)
+
+      assert_equal(
+        [
+          {
+            row: ["valid_1@example.com", "s3krit"],
+            id: User.find_by!(email: "valid_1@example.com").id
+          },
+          {
+            row: ["valid_2@example.com", "s3krit"],
+            id: User.find_by!(email: "valid_2@example.com").id
+          }
+        ],
+        result.rows_accepted
+      )
+      assert_equal(
+        [
+          row: ["invalid@example.com", nil],
+          errors: {password: ["can't be blank"]}
+        ],
+        result.rows_rejected
+      )
+    end
+
+    test "it returns results when rollback is enabled" do
+      csv_string = CSV.generate do |csv|
+        csv << %w[email password]
+        csv << %w[valid_1@example.com s3krit]
+        csv << %w[valid_2@example.com s3krit]
+      end
+
+      result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+
+      assert_equal(
+        [
+          {
+            row: ["valid_1@example.com", "s3krit"],
+            id: User.find_by!(email: "valid_1@example.com").id
+          },
+          {
+            row: ["valid_2@example.com", "s3krit"],
+            id: User.find_by!(email: "valid_2@example.com").id
+          }
+        ],
+        result.rows_accepted
+      )
+      assert_empty result.rows_rejected
+    end
+
+    test "it updates existing records" do
+      # TODO: This requires more thought. We need a way to identify the
+      # record(s) and declare we want to update them. This seems like it could
+      # be a responsibility of a different class?
+      skip
+    end
+  end
 end
