@@ -1,0 +1,38 @@
+name: GitHub Actions Demo
+on: [pull_request]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby-version:
+          - "2.7"
+          - "3.0"
+          - "3.1"
+        rails-version:
+          - "7.0"
+          - "6.1"
+          - "6.0"
+          - "main"
+
+    env:
+      RAILS_VERSION: ${{ matrix.rails-version }}
+
+    name: ${{ format('Tests (Ruby {0}, Rails {1})', matrix.ruby-version, matrix.rails-version) }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@359bebbc29cbe6c87da6bc9ea3bc930432750108
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+      - name: Install dependencies
+        run: bundle install
+      - name: Run linters
+        run: bundle exec standardrb
+      - name: Run migrations
+        run: bundle exec rails db:migrate
+      - name: Run tests
+        run: bundle exec rails test

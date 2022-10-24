@@ -1,3 +1,7 @@
 class ApplicationRecord < ActiveRecord::Base
-  primary_abstract_class
+  if Rails::VERSION::MAJOR < 7
+    self.abstract_class = true
+  else
+    primary_abstract_class
+  end
 end

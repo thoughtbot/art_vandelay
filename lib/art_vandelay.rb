@@ -174,7 +174,11 @@ module ArtVandelay
     end
 
     def build_params(row, attributes)
-      row.to_h.transform_keys(attributes.stringify_keys)
+      attributes = attributes.stringify_keys
+
+      row.to_h.stringify_keys.transform_keys do |key|
+        attributes[key] || key
+      end
     end
 
     def parse_rows(rows, attributes, **options)
