@@ -22,7 +22,11 @@ $ gem install art_vandelay
 ```
 
 ## Contributing
-Please make sure `./bin/ci` passes before opening a Pull Request.
+
+1. Run `./bin/setup`.
+2. Make your changes.
+3. Ensure `./bin/ci` passes.
+4. Create a [pull request](https://github.com/thoughtbot/art_vandelay/compare).
 
 ## License
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).

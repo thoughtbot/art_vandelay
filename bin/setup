@@ -1,0 +1,19 @@
+#!/bin/sh
+
+set -e
+
+echo "[bin/setup] Installing gems"
+rm -f Gemfile.lock
+bundle install
+
+echo "[bin/setup] Dropping and recreating the database"
+bundle exec rails db:reset || bundle exec rails db:migrate
+
+echo
+echo "[bin/setup] Setup complete."
+echo
+echo "[bin/setup] If you want to build against a different version of Rails run
+the following before running the setup script."
+echo
+echo "export RAILS_VERSION=MAJOR.MINOR (e.g. export RAILS_VERSION=6.1)"
+echo
