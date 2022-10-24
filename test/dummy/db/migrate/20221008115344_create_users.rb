@@ -1,4 +1,4 @@
-class CreateUsers < ActiveRecord::Migration[7.0]
+class CreateUsers < ActiveRecord::Migration["#{Rails::VERSION::MAJOR}.#{Rails::VERSION::MINOR}"]
   def change
     create_table :users do |t|
       t.string :email, null: false
