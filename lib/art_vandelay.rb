@@ -69,9 +69,10 @@ module ArtVandelay
     attr_reader :records, :export_sensitive_data, :attributes, :in_batches_of
 
     def file_name(**options)
+      options = options.symbolize_keys
+      suffix = options[:suffix]
       prefix = model_name.downcase
       timestamp = Time.current.in_time_zone("UTC").strftime("%Y-%m-%d-%H-%M-%S-UTC")
-      suffix = options[:suffix]
 
       "#{prefix}-export-#{timestamp}#{suffix}.csv"
     end
