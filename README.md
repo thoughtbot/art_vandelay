@@ -94,7 +94,7 @@ ArtVandelay::Export
 ### 📥 Importing
 
 ```ruby
-ArtVandelay::Export.new(model_name, **options)
+ArtVandelay::Import.new(model_name, **options)
 ```
 
 |Argument|Description|
