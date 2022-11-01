@@ -4,6 +4,15 @@ Demo](https://github.com/thoughtbot/art_vandelay/actions/workflows/ci.yml/badge.
 
 Art Vandelay is an importer/exporter for Rails 6.0 and higher.
 
+Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help. 
+
+**At a high level, here’s what Art Vandelay can do:**
+
+- 🕶 Automatically [filters out sensitive information](#%EF%B8%8F-configuration).
+- 🔁 Export data [in batches](#exporting-in-batches).
+- 📧 [Email](#artvandelayexportemail_csv) exported data.
+- 📥 [Import data](#-importing) from a CSV.
+
 ## 🧰 Usage
 
 ### 📤 Exporting
