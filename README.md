@@ -13,6 +13,37 @@ Have you ever been on a project where, out of nowhere, someone asks you to send 
 - 📧 [Email](#artvandelayexportemail_csv) exported data.
 - 📥 [Import data](#-importing) from a CSV.
 
+## ✅ Installation
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem "art_vandelay", git: "https://github.com/thoughtbot/art_vandelay"
+```
+
+And then execute:
+```bash
+$ bundle
+```
+
+## ⚙️ Configuration
+
+```ruby
+# config/initializers/art_vandelay.rb
+ArtVandelay.setup do |config|
+  config.filtered_attributes = [:credit_card, :birthday]
+  config.from_address = "no-reply-export@example.com"
+  config.in_batches_of = 5000
+end
+```
+#### Default Values
+
+|Attribute|Value|Description|
+|---------|-----|-----------|
+|`filtered_attributes`|`[:passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn]`|Attributes that will be automatically filtered when exported|
+|`from_address`|`nil`|The email address used when sending an email of exports|
+|`in_batches_of`|`10000`|The number of records that will be exported into each CSV|
+
 ## 🧰 Usage
 
 ### 📤 Exporting
@@ -188,37 +219,6 @@ end
 
 result = ArtVandelay::Import.new(:users).csv(csv_string, attributes: {email_address: :email, passcode: :password})
 # => #<ArtVandelay::Import::Result>
-```
-
-## ⚙️ Configuration
-
-```ruby
-# config/initializers/art_vandelay.rb
-ArtVandelay.setup do |config|
-  config.filtered_attributes = [:credit_card, :birthday]
-  config.from_address = "no-reply-export@example.com"
-  config.in_batches_of = 5000
-end
-```
-#### Default Values
-
-|Attribute|Value|Description|
-|---------|-----|-----------|
-|`filtered_attributes`|`[:passw, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn]`|Attributes that will be automatically filtered when exported|
-|`from_address`|`nil`|The email address used when sending an email of exports|
-|`in_batches_of`|`10000`|The number of records that will be exported into each CSV|
-
-## ✅ Installation
-
-Add this line to your application's Gemfile:
-
-```ruby
-gem "art_vandelay", git: "https://github.com/thoughtbot/art_vandelay"
-```
-
-And then execute:
-```bash
-$ bundle
 ```
 
 ## 🙏 Contributing
