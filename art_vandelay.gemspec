@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/thoughtbot/art_vandelay"
-  spec.metadata["changelog_uri"] = "https://github.com/thoughtbot/art_vandelay/CHANGELOG.md"
+  spec.metadata["changelog_uri"] = "https://github.com/thoughtbot/art_vandelay/NEWS.md"
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
