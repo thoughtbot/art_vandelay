@@ -18,7 +18,7 @@ Have you ever been on a project where, out of nowhere, someone asks you to send 
 Add this line to your application's Gemfile:
 
 ```ruby
-gem "art_vandelay", git: "https://github.com/thoughtbot/art_vandelay"
+gem "art_vandelay"
 ```
 
 And then execute:
