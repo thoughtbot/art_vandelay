@@ -375,6 +375,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
+    test "strips whitespace if strip configuration is passed" do
+      csv_string = CSV.generate do |csv|
+        csv << ["email_address ", "  passcode "]
+        csv << ["  email_1@example.com ", " s3krit "]
+        csv << [" email_2@example.com", "   s3kure!  "]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users, strip: true).csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
     test "it no-ops if one record fails to save" do
       csv_string = CSV.generate do |csv|
         csv << %w[email password]

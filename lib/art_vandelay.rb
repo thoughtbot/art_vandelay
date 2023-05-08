@@ -142,6 +142,7 @@ module ArtVandelay
     def initialize(model_name, **options)
       @options = options.symbolize_keys
       @rollback = options[:rollback]
+      @strip = options[:strip]
       @model_name = model_name
     end
 
@@ -164,7 +165,7 @@ module ArtVandelay
 
     private
 
-    attr_reader :model_name, :rollback
+    attr_reader :model_name, :rollback, :strip
 
     def active_record
       model_name.to_s.classify.constantize
@@ -177,8 +178,18 @@ module ArtVandelay
     def build_params(row, attributes)
       attributes = attributes.stringify_keys
 
-      row.to_h.stringify_keys.transform_keys do |key|
-        attributes[key] || key
+      if strip
+        params = row.to_h.stringify_keys.transform_keys do |key|
+          attributes[key.strip] || key.strip
+        end
+
+        params.transform_values do |value|
+          value.strip
+        end
+      else
+        row.to_h.stringify_keys.transform_keys do |key|
+          attributes[key] || key
+        end
       end
     end
 
