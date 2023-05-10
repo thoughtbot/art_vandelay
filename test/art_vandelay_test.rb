@@ -426,13 +426,23 @@ class ArtVandelayTest < ActiveSupport::TestCase
         ],
         result.rows_accepted
       )
-      assert_equal(
-        [
-          row: ["invalid@example.com", nil],
-          errors: {password: ["can't be blank"]}
-        ],
-        result.rows_rejected
-      )
+      if Rails.version >= "7.1"
+        assert_equal(
+          [
+            row: ["invalid@example.com", nil],
+            errors: {password: ["can’t be blank"]}
+          ],
+          result.rows_rejected
+        )
+      else
+        assert_equal(
+          [
+            row: ["invalid@example.com", nil],
+            errors: {password: ["can't be blank"]}
+          ],
+          result.rows_rejected
+        )
+      end
     end
 
     test "it returns results when rollback is enabled" do
