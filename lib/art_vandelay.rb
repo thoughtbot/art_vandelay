@@ -179,12 +179,10 @@ module ArtVandelay
       attributes = attributes.stringify_keys
 
       if strip
-        params = row.to_h.stringify_keys.transform_keys do |key|
+        row.to_h.stringify_keys.transform_keys do |key|
           attributes[key.strip] || key.strip
-        end
-
-        params.transform_values do |value|
-          value.strip
+        end.tap do |new_params|
+          new_params.transform_values!(&:strip)
         end
       else
         row.to_h.stringify_keys.transform_keys do |key|
