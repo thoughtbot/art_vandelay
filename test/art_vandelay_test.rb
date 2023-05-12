@@ -429,7 +429,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal(
         [
           row: ["invalid@example.com", nil],
-          errors: {password: ["can't be blank"]}
+          errors: {password: [I18n.t("errors.messages.blank")]}
         ],
         result.rows_rejected
       )
