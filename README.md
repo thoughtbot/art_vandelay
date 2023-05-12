@@ -140,13 +140,14 @@ ArtVandelay::Import.new(model_name, **options)
 |Argument|Description|
 |--------|-----------|
 |`model_name`|The name of the model being imported. E.g. `:users`, `:user`, `"users"` or `"user"`|
-|`**options`|A hash of options. Available options are `rollback:`|
+|`**options`|A hash of options. Available options are `rollback:`, `strip:`|
 
 #### Options
 
 |Option|Description|
 |------|-----------|
 |`rollback:`|Whether the import should rollback if any of the records fails to save.|
+|`strip:`|Strips leading and trailing whitespace from all values, including headers.|
 
 #### ArtVandelay::Import#csv
 
@@ -219,6 +220,21 @@ end
 
 result = ArtVandelay::Import.new(:users).csv(csv_string, attributes: {email_address: :email, passcode: :password})
 # => #<ArtVandelay::Import::Result>
+```
+
+##### Stripping whitespace
+
+```ruby
+csv_string = CSV.generate do |csv|
+  csv << ["email_address  ", " passcode  "]
+  csv << ["  george@vandelay_industries.com  ", "  bosco  "]
+end
+
+result = ArtVandelay::Import.new(:users, strip: true).csv(csv_string, attributes: {email_address: :email, passcode: :password})
+# => #<ArtVandelay::Import::Result>
+
+result.rows_accepted
+# => [{:row=>["george@vandelay_industries.com", "bosco"], :id=>1}]
 ```
 
 ## 🙏 Contributing
