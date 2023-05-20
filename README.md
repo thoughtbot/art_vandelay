@@ -67,7 +67,7 @@ Returns an instance of `ArtVandelay::Export::Result`.
 result = ArtVandelay::Export.new(User.all).csv
 # => #<ArtVandelay::Export::Result>
 
-csv_exports = result.result.csv_exports
+csv_exports = result.csv_exports
 # => [#<CSV::Table>, #<CSV::Table>, ...]
 
 csv = csv_exports.first.to_a
