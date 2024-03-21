@@ -4,14 +4,14 @@ Demo](https://github.com/thoughtbot/art_vandelay/actions/workflows/ci.yml/badge.
 
 Art Vandelay is an importer/exporter for Rails 7.0 and higher.
 
-Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help. 
+Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help.
 
 **At a high level, here’s what Art Vandelay can do:**
 
 - 🕶 Automatically [filters out sensitive information](#%EF%B8%8F-configuration).
 - 🔁 Export data [in batches](#exporting-in-batches).
 - 📧 [Email](#artvandelayexportemail_csv) exported data.
-- 📥 [Import data](#-importing) from a CSV.
+- 📥 [Import data](#-importing) from a CSV or JSON file.
 
 ## ✅ Installation
 
@@ -128,7 +128,7 @@ ArtVandelay::Export
     subject: "List of confirmed users",
     body: "Here's an export of all confirmed users in our database."
   )
-# => ActionMailer::Base#mail: processed outbound mail in...  
+# => ActionMailer::Base#mail: processed outbound mail in...
 ```
 
 ### 📥 Importing
@@ -179,25 +179,12 @@ csv(csv_string, **options)
 |`csv_string`|Data in the form of a CSV string.|
 |`**options`|A hash of options. Available options are `headers:` and `attributes:`|
 
-#### Options
+##### Options
 
 |Option|Description|
 |------|-----------|
 |`headers:`|The CSV headers. Use when the supplied CSV string does not have headers.|
 |`attributes:`|The attributes the headers should map to. Useful if the headers do not match the model's attributes.|
-
-##### Rolling back if a record fails to save
-
-```ruby
-csv_string = CSV.generate do |csv|
-  csv << ["email", "password"]
-  csv << ["george@vandelay_industries.com", "bosco"]
-  csv << ["kel_varnsen@vandelay_industries.com", nil]
-end
-
-result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
-# => rollback transaction
-```
 
 ##### Setting headers
 
@@ -210,7 +197,60 @@ result = ArtVandelay::Import.new(:users).csv(csv_string, headers: [:email, :pass
 # => #<ArtVandelay::Import::Result>
 ```
 
-##### Mapping custom headers
+#### ArtVandelay::Import#json
+
+Imports records from the supplied JSON. Returns an instance of `ArtVandelay::Import::Result`.
+
+```ruby
+json_string = [
+  {
+    email: "george@vandelay_industries.com",
+    password: "bosco"
+  },
+  {
+    email: "kel_varnsen@vanderlay_industries.com",
+    password: nil
+  }
+].to_json
+
+result = ArtVandelay::Import.new(:users).json(json_string)
+# => #<ArtVandelay::Import::Result>
+
+result.rows_accepted
+# => [{:row=>[{"email"=>"george@vandelay_industries.com", "password"=>"bosco"}], :id=>1}]
+
+result.rows_rejected
+# => [{:row=>[{"email"=>"kel_varnsen@vandelay_industries.com", "password"=>nil}], :errors=>{:password=>["can't be blank"]}}]
+```
+
+```ruby
+json(json_string, **options)
+```
+
+##### Options
+
+|Option|Description|
+|------|-----------|
+|`attributes:`|The attributes the JSON object keys should map to. Useful if the headers do not match the model's attributes.|
+
+#### Rolling back if a record fails to save
+
+`ArtVandelay::Import.new` supports a `:rollback` keyword argument. It imports all rows as a single transaction and does not persist any records if one record fails due to an exception.
+
+```ruby
+csv_string = CSV.generate do |csv|
+  csv << ["email", "password"]
+  csv << ["george@vandelay_industries.com", "bosco"]
+  csv << ["kel_varnsen@vandelay_industries.com", nil]
+end
+
+result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+# => rollback transaction
+```
+
+#### Mapping custom headers
+
+Both `ArtVandelay::Import#csv` and `#json` support an `:attributes` keyword argument. This lets you map fields in the import document to your Active Record model's attributes.
 
 ```ruby
 csv_string = CSV.generate do |csv|
@@ -222,7 +262,9 @@ result = ArtVandelay::Import.new(:users).csv(csv_string, attributes: {email_addr
 # => #<ArtVandelay::Import::Result>
 ```
 
-##### Stripping whitespace
+#### Stripping whitespace
+
+`ArtVandelay::Import.new` supports a `:strip` keyword argument to strip whitespace from values in the import document.
 
 ```ruby
 csv_string = CSV.generate do |csv|

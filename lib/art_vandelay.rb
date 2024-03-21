@@ -163,6 +163,20 @@ module ArtVandelay
       end
     end
 
+    def json(json_string, **options)
+      options = options.symbolize_keys
+      attributes = options[:attributes] || {}
+      array = JSON.parse(json_string)
+
+      if rollback
+        active_record.transaction do
+          parse_json_data(array, attributes, raise_on_error: true)
+        end
+      else
+        parse_json_data(array, attributes)
+      end
+    end
+
     private
 
     attr_reader :model_name, :rollback, :strip
@@ -189,6 +203,24 @@ module ArtVandelay
           attributes[key] || key
         end
       end
+    end
+
+    def parse_json_data(array, attributes, **options)
+      raise_on_error = options[:raise_on_error] || false
+      result = Result.new(rows_accepted: [], rows_rejected: [])
+
+      array.each do |entry|
+        params = build_params(entry, attributes)
+        record = active_record.new(params)
+
+        if raise_on_error ? record.save! : record.save
+          result.rows_accepted << {row: entry, id: record.id}
+        else
+          result.rows_rejected << {row: entry, errors: record.errors.messages}
+        end
+      end
+
+      result
     end
 
     def parse_rows(rows, attributes, **options)

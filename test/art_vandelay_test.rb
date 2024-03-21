@@ -344,7 +344,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it strips whitespace when strip configuration is passed" do
+    test "it imports data from a JSON string" do
+      json_string = [
+        {email: "email_1@example.com", password: "s3krit"},
+        {email: "email_2@example.com", password: "s3kure!"}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).json(json_string)
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it strips whitespace from CSVs when strip configuration is passed" do
       csv_string = CSV.generate do |csv|
         csv << [" email ", "   password  "]
         csv << ["  email_1@example.com ", " s3krit "]
@@ -364,7 +383,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it sets the headers" do
+    test "it strips whitespace from JSON when strip configuration is passed" do
+      json_string = [
+        {email: "  email_1@example.com ", password: " s3krit "},
+        {email: " email_2@example.com ", password: " s3kure!  "}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users, strip: true).json(json_string)
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it sets the CSV headers" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_1@example.com s3krit]
         csv << %w[email_2@example.com s3kure!]
@@ -383,7 +421,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "maps to custom headers" do
+    test "it maps CSV headers to Active Record attributes" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_address passcode]
         csv << %w[email_1@example.com s3krit]
@@ -403,15 +441,19 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "strips whitespace if strip configuration is passed when using custom attributes" do
-      csv_string = CSV.generate do |csv|
-        csv << ["email_address ", "  passcode "]
-        csv << ["  email_1@example.com ", " s3krit "]
-        csv << [" email_2@example.com", "   s3kure!  "]
-      end
+    test "it maps JSON keys to Active Record attributes" do
+      json_string = [
+        {email_address: "email_1@example.com", passcode: "s3krit"},
+        {email_address: "email_2@example.com", passcode: "s3kure!"}
+      ].to_json
 
       assert_difference("User.count", 2) do
-        ArtVandelay::Import.new(:users, strip: true).csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+        ArtVandelay::Import
+          .new(:users)
+          .json(
+            json_string,
+            attributes: {:email_address => :email, "passcode" => "password"}
+          )
       end
 
       user_1 = User.find_by!(email: "email_1@example.com")
@@ -423,7 +465,53 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it no-ops if one record fails to save" do
+    test "strips whitespace from CSVs if strip configuration is passed when using custom attributes" do
+      csv_string = CSV.generate do |csv|
+        csv << ["email_address ", "  passcode "]
+        csv << ["  email_1@example.com ", " s3krit "]
+        csv << [" email_2@example.com", "   s3kure!  "]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import
+          .new(:users, strip: true)
+          .csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "strips whitespace from JSON if the strip configuration is passed when using custom attributes" do
+      json_string = [
+        {email_address: "  email_1@example.com ", passcode: " s3krit "},
+        {email_address: " email_2@example.com", passcode: "   s3kure!  "}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import
+          .new(:users, strip: true)
+          .json(
+            json_string,
+            attributes: {:email_address => :email, "passcode" => "password"}
+          )
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it no-ops if one record fails to save and 'rollback' is enabled" do
       csv_string = CSV.generate do |csv|
         csv << %w[email password]
         csv << %w[valid@example.com s3kure!]
@@ -431,9 +519,21 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid@example.com s3kure!]
       end
 
+      json_string = [
+        {email: "valid@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
       assert_no_difference("User.count") do
         assert_raises ActiveRecord::RecordInvalid do
           ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+        end
+      end
+
+      assert_no_difference("User.count") do
+        assert_raises ActiveRecord::RecordInvalid do
+          ArtVandelay::Import.new(:users, rollback: true).json(json_string)
         end
       end
     end
@@ -449,6 +549,16 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_difference("User.count", 2) do
         ArtVandelay::Import.new(:users).csv(csv_string)
       end
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
+      assert_difference("User.count", 1) do
+        ArtVandelay::Import.new(:users).json(json_string)
+      end
     end
 
     test "returns results" do
@@ -459,7 +569,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid_2@example.com s3krit]
       end
 
-      result = ArtVandelay::Import.new(:users).csv(csv_string)
+      csv_result = ArtVandelay::Import.new(:users).csv(csv_string)
 
       assert_equal(
         [
@@ -472,14 +582,46 @@ class ArtVandelayTest < ActiveSupport::TestCase
             id: User.find_by!(email: "valid_2@example.com").id
           }
         ],
-        result.rows_accepted
+        csv_result.rows_accepted
       )
       assert_equal(
         [
           row: ["invalid@example.com", nil],
           errors: {password: [I18n.t("errors.messages.blank")]}
         ],
-        result.rows_rejected
+        csv_result.rows_rejected
+      )
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
+      json_result = ArtVandelay::Import.new(:users).json(json_string)
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "valid_3@example.com", "password" => "s3kure!"},
+            id: User.find_by!(email: "valid_3@example.com").id
+          }
+        ],
+        json_result.rows_accepted
+      )
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "invalid@example.com"},
+            errors: {password: [I18n.t("errors.messages.blank")]}
+          },
+          {
+            row: {"email" => "invalid2@example.com", "password" => nil},
+            errors: {password: [I18n.t("errors.messages.blank")]}
+          }
+        ],
+        json_result.rows_rejected
       )
     end
 
@@ -490,7 +632,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid_2@example.com s3krit]
       end
 
-      result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+      csv_result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
 
       assert_equal(
         [
@@ -503,9 +645,27 @@ class ArtVandelayTest < ActiveSupport::TestCase
             id: User.find_by!(email: "valid_2@example.com").id
           }
         ],
-        result.rows_accepted
+        csv_result.rows_accepted
       )
-      assert_empty result.rows_rejected
+      assert_empty csv_result.rows_rejected
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"}
+      ].to_json
+
+      json_result =
+        ArtVandelay::Import.new(:users, rollback: true).json(json_string)
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "valid_3@example.com", "password" => "s3kure!"},
+            id: User.find_by!(email: "valid_3@example.com").id
+          }
+        ],
+        json_result.rows_accepted
+      )
+      assert_empty json_result.rows_rejected
     end
 
     test "it updates existing records" do
