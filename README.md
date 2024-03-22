@@ -10,7 +10,7 @@ Have you ever been on a project where, out of nowhere, someone asks you to send 
 
 - 🕶 Automatically [filters out sensitive information](#%EF%B8%8F-configuration).
 - 🔁 Export data [in batches](#exporting-in-batches).
-- 📧 [Email](#artvandelayexportemail_csv) exported data.
+- 📧 [Email](#artvandelayexportemail) exported data.
 - 📥 [Import data](#-importing) from a CSV or JSON file.
 
 ## ✅ Installation
@@ -121,12 +121,12 @@ csv_size = result.csv_exports.first.size
 # => 100
 ```
 
-#### ArtVandelay::Export#email_csv
+#### ArtVandelay::Export#email
 
-Emails the recipient(s) CSV exports as attachments.
+Emails the recipient(s) exports as attachments.
 
 ```ruby
-email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
+email(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
 ```
 
 |Argument|Description|
@@ -135,15 +135,17 @@ email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", 
 |`from`|The email address of the sender.|
 |`subject`|The email subject. Defaults to the following pattern: "User export"|
 |`body`|The email body. Defaults to the following pattern: "User export"|
+|`format`|The format of the export file. Either `:csv` or `:json`.|
 
 ```ruby
 ArtVandelay::Export
   .new(User.where.not(confirmed: nil))
-  .email_csv(
+  .email(
     to: ["george@vandelay_industries.com", "kel_varnsen@vandelay_industries.com"],
     from: "noreply@vandelay_industries.com",
     subject: "List of confirmed users",
-    body: "Here's an export of all confirmed users in our database."
+    body: "Here's an export of all confirmed users in our database.",
+    format: :json
   )
 # => ActionMailer::Base#mail: processed outbound mail in...
 ```

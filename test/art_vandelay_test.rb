@@ -283,7 +283,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.all).email_csv(
+        ArtVandelay::Export.new(User.all).email(
           to: ["recipient_1@examaple.com", "recipient_2@example.com"],
           from: "sender@example.com"
         )
@@ -306,11 +306,45 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "user-export-1989-12-31-00-00-00-UTC.csv", csv.filename
     end
 
+    test "it emails a JSON file" do
+      travel_to Date.new(1989, 12, 31).beginning_of_day
+      user = User.create!(email: "user@xample.com", password: "password")
+
+      assert_emails 1 do
+        ArtVandelay::Export.new(User.all).email(
+          to: ["recipient_1@examaple.com", "recipient_2@example.com"],
+          from: "sender@example.com",
+          format: :json
+        )
+      end
+
+      email = ActionMailer::Base.deliveries.last
+      json = email.attachments.first
+
+      assert_equal(
+        ["recipient_1@examaple.com", "recipient_2@example.com"],
+        email.to
+      )
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email,
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json.body.raw_source)
+      )
+      assert_equal "user-export-1989-12-31-00-00-00-UTC.json", json.filename
+    end
+
     test "it requires a from address" do
       User.create!(email: "user@xample.com", password: "password")
 
       assert_raises ArtVandelay::Error do
-        ArtVandelay::Export.new(User.all).email_csv(
+        ArtVandelay::Export.new(User.all).email(
           to: ["recipient_1@examaple.com"]
         )
       end
@@ -321,7 +355,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.first).email_csv(
+        ArtVandelay::Export.new(User.first).email(
           to: ["recipient_1@examaple.com", "recipient_2@example.com"],
           from: "sender@example.com"
         )
@@ -350,7 +384,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       User.create!(email: "two@example.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.all, in_batches_of: 1).email_csv(
+        ArtVandelay::Export.new(User.all, in_batches_of: 1).email(
           to: ["recipient_1@examaple.com"],
           from: "sender@example.com"
         )
@@ -373,7 +407,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it has a default subject" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com"
       )
@@ -385,7 +419,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it can set the subject" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com",
         subject: "CUSTOM SUBJECT"
@@ -398,7 +432,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it can set a from address" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "FROM@EMAIL.COM"
       )
@@ -412,7 +446,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       ArtVandelay.setup do |config|
         config.from_address = "DEFAULT@EMAIL.COM"
       end
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"]
       )
       email = ActionMailer::Base.deliveries.last
@@ -424,7 +458,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
 
     test "it has a default body" do
       User.create!(email: "user@xample.com", password: "password")
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com"
       )
@@ -435,7 +469,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
 
     test "it can set the body" do
       User.create!(email: "user@xample.com", password: "password")
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com",
         body: "CUSTOM BODY"

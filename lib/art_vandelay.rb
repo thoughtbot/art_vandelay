@@ -61,19 +61,26 @@ module ArtVandelay
       Result.new(json_exports)
     end
 
-    def email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
+    def email(
+      to:,
+      from: ArtVandelay.from_address,
+      subject: "#{model_name} export",
+      body: "#{model_name} export",
+      format: :csv
+    )
       if from.nil?
         raise ArtVandelay::Error, "missing keyword: :from. Alternatively, set a value on ArtVandelay.from_address"
       end
 
       mailer = ActionMailer::Base.mail(to: to, from: from, subject: subject, body: body)
-      exports = csv.exports
+      exports = public_send(format).exports
 
-      exports.each.with_index(1) do |csv, index|
+      exports.each.with_index(1) do |export, index|
         if exports.one?
-          mailer.attachments[file_name] = csv
+          mailer.attachments[file_name(format: format)] = export
         else
-          mailer.attachments[file_name(suffix: "-#{index}")] = csv
+          file = file_name(suffix: "-#{index}", format: format)
+          mailer.attachments[file] = export
         end
       end
 
@@ -86,11 +93,12 @@ module ArtVandelay
 
     def file_name(**options)
       options = options.symbolize_keys
+      format = options[:format]
       suffix = options[:suffix]
       prefix = model_name.downcase
       timestamp = Time.current.in_time_zone("UTC").strftime("%Y-%m-%d-%H-%M-%S-UTC")
 
-      "#{prefix}-export-#{timestamp}#{suffix}.csv"
+      "#{prefix}-export-#{timestamp}#{suffix}.#{format}"
     end
 
     def filtered_values(attributes, format:)
