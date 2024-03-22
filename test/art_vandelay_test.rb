@@ -34,10 +34,18 @@ class ArtVandelayTest < ActiveSupport::TestCase
   class Export < ArtVandelayTest
     include ActionMailer::TestHelper
 
-    test "it returns a ArtVandelay::Export::Result instance" do
+    test "CSV files return a ArtVandelay::Export::Result instance" do
       User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all).csv
+
+      assert_instance_of ArtVandelay::Export::Result, result
+    end
+
+    test "JSON files return a ArtVandelay::Export::Result instance" do
+      User.create!(email: "user@xample.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all).json
 
       assert_instance_of ArtVandelay::Export::Result, result
     end
@@ -46,7 +54,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all).csv
-      csv = result.csv_exports.first
+      csv = result.exports.first
 
       assert_equal(
         [
@@ -58,6 +66,34 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal(
         ["id", "email", "password", "created_at", "updated_at"],
         csv.headers
+      )
+    end
+
+    test "it creates a JSON file containing the correct data" do
+      user_1 = User.create!(email: "user_1@example.com", password: "password")
+      user_2 = User.create!(email: "user_2@example.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all).json
+      json = result.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user_1.id,
+            "email" => "user_1@example.com",
+            "password" => "[FILTERED]",
+            "created_at" => user_1.created_at.iso8601(3),
+            "updated_at" => user_1.updated_at.iso8601(3)
+          },
+          {
+            "id" => user_2.id,
+            "email" => "user_2@example.com",
+            "password" => "[FILTERED]",
+            "created_at" => user_2.created_at.iso8601(3),
+            "updated_at" => user_2.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
       )
     end
 
@@ -65,7 +101,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.first).csv
-      csv = result.csv_exports.first
+      csv = result.exports.first
 
       assert_equal(
         [
@@ -80,13 +116,32 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
-    test "it controlls what data is filtered" do
+    test "it creates a JSON file when passed one record" do
+      user = User.create!(email: "user@xample.com", password: "password")
+      result = ArtVandelay::Export.new(User.first).json
+      json = result.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email.to_s,
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+    end
+
+    test "it controls what data is filtered from CSV output" do
       user = User.create!(email: "user@xample.com", password: "password")
       ArtVandelay.setup do |config|
         config.filtered_attributes << :email
       end
 
-      csv = ArtVandelay::Export.new(User.all).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all).csv.exports.first
 
       assert_equal(
         [
@@ -98,10 +153,34 @@ class ArtVandelayTest < ActiveSupport::TestCase
       ArtVandelay.filtered_attributes.delete(:email)
     end
 
-    test "it allows for unfiltered exports" do
+    test "it controls what data is filtered from JSON output" do
+      user = User.create!(email: "user@example.com", password: "password")
+      ArtVandelay.setup do |config|
+        config.filtered_attributes << :email
+      end
+
+      json = ArtVandelay::Export.new(User.all).json.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => "[FILTERED]",
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+
+      ArtVandelay.filtered_attributes.delete(:email)
+    end
+
+    test "it allows for unfiltered CSV exports" do
       user = User.create!(email: "user@xample.com", password: "password")
 
-      csv = ArtVandelay::Export.new(User.all, export_sensitive_data: true).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all, export_sensitive_data: true).csv.exports.first
 
       assert_equal(
         [
@@ -112,10 +191,31 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
-    test "it controlls what attributes are exported" do
+    test "it allows for unfiltered JSON exports" do
+      user = User.create!(email: "user@example.com", password: "password")
+      json = ArtVandelay::Export.new(User.all, export_sensitive_data: true)
+        .json
+        .exports
+        .first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email,
+            "password" => "password",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+    end
+
+    test "it controls what attributes are exported to CSVs" do
       user = User.create!(email: "user@xample.com", password: "password")
 
-      csv = ArtVandelay::Export.new(User.all, attributes: [:id, "email"]).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all, attributes: [:id, "email"]).csv.exports.first
 
       assert_equal(
         [
@@ -126,16 +226,39 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
+    test "controls what attributes are exported to JSON" do
+      user = User.create!(email: "user@xample.com", password: "password")
+      json = ArtVandelay::Export.new(User.all, attributes: [:id, "email"])
+        .json
+        .exports
+        .first
+
+      assert_equal [{"id" => user.id, "email" => user.email}],
+        JSON.parse(json)
+    end
+
     test "it batches CSV exports" do
       User.create!(email: "one@xample.com", password: "password")
       User.create!(email: "two@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all, in_batches_of: 1).csv
-      csv_1 = result.csv_exports.first
-      csv_2 = result.csv_exports.last
+      csv_1 = result.exports.first
+      csv_2 = result.exports.last
 
       assert "one@example.com", csv_1.first["email"]
       assert "two@example.com", csv_2.first["email"]
+    end
+
+    test "it batches JSON exports" do
+      User.create!(email: "one@example.com", password: "password")
+      User.create!(email: "two@example.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all, in_batches_of: 1).json
+      json_1 = result.exports.first
+      json_2 = result.exports.last
+
+      assert "one@example.com", json_1.first["email"]
+      assert "two@example.com", json_2.first["email"]
     end
 
     test "it can set the default batch size" do
@@ -146,8 +269,8 @@ class ArtVandelayTest < ActiveSupport::TestCase
       end
 
       result = ArtVandelay::Export.new(User.all).csv
-      csv_1 = result.csv_exports.first
-      csv_2 = result.csv_exports.last
+      csv_1 = result.exports.first
+      csv_2 = result.exports.last
 
       assert "one@example.com", csv_1.first["email"]
       assert "two@example.com", csv_2.first["email"]

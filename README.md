@@ -48,6 +48,8 @@ end
 
 ### 📤 Exporting
 
+Art Vandelay supports exporting CSVs and JSON files.
+
 ```ruby
 ArtVandelay::Export.new(records, export_sensitive_data: false, attributes: [], in_batches_of: ArtVandelay.in_batches_of)
 ```
@@ -57,7 +59,7 @@ ArtVandelay::Export.new(records, export_sensitive_data: false, attributes: [], i
 |`records`|An [Active Record Relation](https://api.rubyonrails.org/classes/ActiveRecord/Relation.html) or an instance of an Active Record. E.g. `User.all`, `User.first`, `User.where(...)`, `User.find_by`|
 |`export_sensitive_data`|Export sensitive data. Defaults to `false`. Can be configured with `ArtVandelay.filtered_attributes`.|
 |`attributes`|An array attributes to export. Default to all.|
-|`in_batches_of`|The number of records that will be exported into each CSV. Defaults to 10,000. Can be configured with `ArtVandelay.in_batches_of`|
+|`in_batches_of`|The number of records that will be exported into each file. Defaults to 10,000. Can be configured with `ArtVandelay.in_batches_of`|
 
 #### ArtVandelay::Export#csv
 
@@ -72,6 +74,21 @@ csv_exports = result.csv_exports
 
 csv = csv_exports.first.to_a
 # => [["id", "email", "password", "created_at", "updated_at"], ["1", "user@example.com", "[FILTERED]", "2022-10-25 09:20:28 UTC", "2022-10-25 09:20:28 UTC"]]
+```
+
+#### ArtVandelay::Export#json
+
+Returns an instance of `ArtVandelay::Export::Result`.
+
+```ruby
+result = ArtVandelay::Export.new(User.all).json
+# => #<ArtVandelay::Export::Result>
+
+json_exports = result.json_exports
+# => [#<CSV::Table>, #<CSV::Table>, ...]
+
+json = JSON.parse(json_exports.first)
+# => [{"id"=>1, "email"=>"user@example.com", "password"=>"[FILTERED]", "created_at"=>"2022-10-25 09:20:28.123Z", "updated_at"=>"2022-10-25 09:20:28.123Z"}]
 ```
 
 ##### Exporting Sensitive Data

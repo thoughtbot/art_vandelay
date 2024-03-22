@@ -16,10 +16,10 @@ module ArtVandelay
 
   class Export
     class Result
-      attr_reader :csv_exports
+      attr_reader :exports
 
-      def initialize(csv_exports)
-        @csv_exports = csv_exports
+      def initialize(exports)
+        @exports = exports
       end
     end
 
@@ -45,16 +45,32 @@ module ArtVandelay
       Result.new(csv_exports)
     end
 
+    def json
+      json_exports = []
+
+      if records.is_a?(ActiveRecord::Relation)
+        records.in_batches(of: in_batches_of) do |relation|
+          json_exports << relation
+            .map { |record| row(record.attributes, format: :hash) }
+            .to_json
+        end
+      elsif records.is_a?(ActiveRecord::Base)
+        json_exports << [row(records.attributes, format: :hash)].to_json
+      end
+
+      Result.new(json_exports)
+    end
+
     def email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
       if from.nil?
         raise ArtVandelay::Error, "missing keyword: :from. Alternatively, set a value on ArtVandelay.from_address"
       end
 
       mailer = ActionMailer::Base.mail(to: to, from: from, subject: subject, body: body)
-      csv_exports = csv.csv_exports
+      exports = csv.exports
 
-      csv_exports.each.with_index(1) do |csv, index|
-        if csv_exports.one?
+      exports.each.with_index(1) do |csv, index|
+        if exports.one?
           mailer.attachments[file_name] = csv
         else
           mailer.attachments[file_name(suffix: "-#{index}")] = csv
@@ -77,11 +93,17 @@ module ArtVandelay
       "#{prefix}-export-#{timestamp}#{suffix}.csv"
     end
 
-    def filtered_values(attributes)
-      if export_sensitive_data
-        ActiveSupport::ParameterFilter.new([]).filter(attributes).values
-      else
-        ActiveSupport::ParameterFilter.new(ArtVandelay.filtered_attributes).filter(attributes).values
+    def filtered_values(attributes, format:)
+      attributes =
+        if export_sensitive_data
+          ActiveSupport::ParameterFilter.new([]).filter(attributes)
+        else
+          ActiveSupport::ParameterFilter.new(ArtVandelay.filtered_attributes).filter(attributes)
+        end
+
+      case format
+      when :hash then attributes
+      when :array then attributes.values
       end
     end
 
@@ -116,11 +138,11 @@ module ArtVandelay
       records.model_name.name
     end
 
-    def row(attributes)
+    def row(attributes, format: :array)
       if self.attributes.any?
-        filtered_values(attributes.slice(*standardized_attributes))
+        filtered_values(attributes.slice(*standardized_attributes), format:)
       else
-        filtered_values(attributes)
+        filtered_values(attributes, format:)
       end
     end
 
