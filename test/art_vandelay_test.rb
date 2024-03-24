@@ -375,6 +375,33 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
+    test "it accepts seeded Active Record attribute values" do
+      author_of_imported_posts =
+        User.create!(email: "author@example.com", password: "password")
+
+      csv_string = CSV.generate do |csv|
+        csv << %w[title1 content1]
+        csv << %w[title2 content2]
+      end
+
+      assert_difference("Post.count", 2) do
+        ArtVandelay::Import.new(:posts, rollback: true)
+          .csv(
+            csv_string,
+            headers: [:title, :content],
+            context: {user: author_of_imported_posts}
+          )
+      end
+
+      post_1 = Post.find_by!(title: "title1")
+      post_2 = Post.find_by!(title: "title2")
+
+      assert_equal "title1", post_1.title
+      assert_equal author_of_imported_posts, post_1.user
+      assert_equal "title2", post_2.title
+      assert_equal author_of_imported_posts, post_2.user
+    end
+
     test "maps to custom headers" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_address passcode]

@@ -150,16 +150,17 @@ module ArtVandelay
       options = options.symbolize_keys
       headers = options[:headers] || true
       attributes = options[:attributes] || {}
+      context = options[:context] || {}
       rows = build_csv(csv_string, headers)
 
       if rollback
         # TODO: It would be nice to still return a result object during a
         # failure
         active_record.transaction do
-          parse_rows(rows, attributes, raise_on_error: true)
+          parse_rows(rows, attributes, context, raise_on_error: true)
         end
       else
-        parse_rows(rows, attributes)
+        parse_rows(rows, attributes, context)
       end
     end
 
@@ -191,13 +192,13 @@ module ArtVandelay
       end
     end
 
-    def parse_rows(rows, attributes, **options)
+    def parse_rows(rows, attributes, context, **options)
       options = options.symbolize_keys
       raise_on_error = options[:raise_on_error] || false
       result = Result.new(rows_accepted: [], rows_rejected: [])
 
       rows.each do |row|
-        params = build_params(row, attributes)
+        params = build_params(row, attributes).merge(context)
         record = active_record.new(params)
 
         if raise_on_error ? record.save! : record.save

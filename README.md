@@ -177,7 +177,7 @@ csv(csv_string, **options)
 |Argument|Description|
 |--------|-----------|
 |`csv_string`|Data in the form of a CSV string.|
-|`**options`|A hash of options. Available options are `headers:` and `attributes:`|
+|`**options`|A hash of options. Available options are `headers:`, `attributes:`, and `context:`|
 
 #### Options
 
@@ -185,6 +185,7 @@ csv(csv_string, **options)
 |------|-----------|
 |`headers:`|The CSV headers. Use when the supplied CSV string does not have headers.|
 |`attributes:`|The attributes the headers should map to. Useful if the headers do not match the model's attributes.|
+|`context:`|A hash of hard-coded data that is imported in addition to the import data. This can be used to make association validations pass if an import is meant to be scoped to a specific user or account, for example.|
 
 ##### Rolling back if a record fails to save
 
@@ -222,7 +223,25 @@ result = ArtVandelay::Import.new(:users).csv(csv_string, attributes: {email_addr
 # => #<ArtVandelay::Import::Result>
 ```
 
-##### Stripping whitespace
+#### Adding context to imports
+
+`ArtVandelay::Import#csv` supports a `:context` keyword argument. This lets you provide additional context that the import data may not contain. For example, you may wish to import all records with references to a specific user or account.
+
+```ruby
+csv_string = CSV.generate do |csv|
+  csv << ["email_address", "passcode"]
+  csv << ["george@vandelay_industries.com", "bosco"]
+end
+
+result = ArtVandelay::Import.new(:users).csv(
+  csv_string,
+  attributes: {email_address: :email, passcode: :password},
+  context: {account: Account.find_by!(code: "VANDELAY_INDUSTRIES")}
+)
+# => #<ArtVandelay::Import::Result>
+```
+
+#### Stripping whitespace
 
 ```ruby
 csv_string = CSV.generate do |csv|
