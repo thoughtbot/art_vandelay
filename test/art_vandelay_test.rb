@@ -72,6 +72,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
+    test "it creates a CSV when passed an Array of ActiveRecord instances" do
+      user = User.create!(email: "user@xample.com", password: "password")
+      export = User.find_by_sql("SELECT id, 'custom_value' AS custom_field FROM users")
+
+      result = ArtVandelay::Export.new(export).csv
+      csv = result.csv_exports.first
+
+      assert_equal(
+        [
+          ["id", "custom_field"],
+          [user.id.to_s, "custom_value"]
+        ],
+        csv.to_a
+      )
+      assert_equal(
+        ["id", "custom_field"],
+        csv.headers
+      )
+    end
+
     test "it controlls what data is filtered" do
       user = User.create!(email: "user@xample.com", password: "password")
       ArtVandelay.setup do |config|
