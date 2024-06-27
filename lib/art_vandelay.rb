@@ -41,7 +41,9 @@ module ArtVandelay
       elsif records.is_a?(ActiveRecord::Base)
         csv_exports << CSV.parse(generate_csv(records), headers: true)
       elsif records.is_a?(Array)
-        csv_exports << CSV.parse(generate_csv(records), headers: true)
+        if records.any?
+          csv_exports << CSV.parse(generate_csv(records), headers: true)
+        end
       end
 
       Result.new(csv_exports)
@@ -125,6 +127,8 @@ module ArtVandelay
         records.model_name.name
       when Array
         records.first.model_name.name
+      else
+        raise "Unsupported export: #{records.class}"
       end
     end
 

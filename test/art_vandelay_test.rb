@@ -92,6 +92,12 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
+    test "it does not create a CSV when passed an empty Array" do
+      result = ArtVandelay::Export.new([]).csv
+
+      assert_empty result.csv_exports
+    end
+
     test "it controlls what data is filtered" do
       user = User.create!(email: "user@xample.com", password: "password")
       ArtVandelay.setup do |config|
