@@ -23,5 +23,5 @@ if rails_version.start_with? "6"
 end
 gem "rails", rails_constraint
 gem "sprockets-rails"
-gem "sqlite3"
+gem "sqlite3", "~> 1.4"
 gem "standardrb"
