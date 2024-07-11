@@ -40,6 +40,10 @@ module ArtVandelay
         end
       elsif records.is_a?(ActiveRecord::Base)
         csv_exports << CSV.parse(generate_csv(records), headers: true)
+      elsif records.is_a?(Array)
+        if records.any?
+          csv_exports << CSV.parse(generate_csv(records), headers: true)
+        end
       end
 
       Result.new(csv_exports)
@@ -88,7 +92,7 @@ module ArtVandelay
     def generate_csv(relation)
       CSV.generate do |csv|
         csv << header
-        if relation.is_a?(ActiveRecord::Relation)
+        if relation.is_a?(ActiveRecord::Relation) || relation.is_a?(Array)
           relation.each do |record|
             csv << row(record.attributes)
           end
@@ -104,7 +108,12 @@ module ArtVandelay
           standardized_attributes.include?(column_name)
         end
       else
-        model.attribute_names
+        case records
+        when ActiveRecord::Relation, ActiveRecord::Base
+          model.attribute_names
+        when Array
+          records.first.attributes.keys
+        end
       end
     end
 
@@ -113,7 +122,14 @@ module ArtVandelay
     end
 
     def model_name
-      records.model_name.name
+      case records
+      when ActiveRecord::Relation, ActiveRecord::Base
+        records.model_name.name
+      when Array
+        records.first.model_name.name
+      else
+        raise "Unsupported export: #{records.class}"
+      end
     end
 
     def row(attributes)
