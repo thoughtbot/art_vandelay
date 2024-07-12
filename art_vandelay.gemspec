@@ -3,6 +3,7 @@ require_relative "lib/art_vandelay/version"
 Gem::Specification.new do |spec|
   spec.name = "art_vandelay"
   spec.version = ArtVandelay::VERSION
+  spec.required_ruby_version = ArtVandelay::MINIMUM_RUBY_VERSION
   spec.authors = ["Steve Polito"]
   spec.email = ["stevepolito@hey.com"]
   spec.homepage = "https://github.com/thoughtbot/art_vandelay"
@@ -18,5 +19,5 @@ Gem::Specification.new do |spec|
     Dir["{app,config,db,lib}/**/*", "MIT-LICENSE", "Rakefile", "README.md"]
   end
 
-  spec.add_dependency "rails"
+  spec.add_dependency "rails", ArtVandelay::RAILS_VERSION
 end

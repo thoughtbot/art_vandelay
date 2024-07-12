@@ -1,3 +1,8 @@
+Unreleased
+
+- Drops support for Ruby 3.0, since it is EOL.
+- Drops support for Rails 6.
+
 0.2.0 (June 15, 2023)
 
 Add option that allows stripping of whitespace for all values (#19)
