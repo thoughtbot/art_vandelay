@@ -4,14 +4,14 @@ Demo](https://github.com/thoughtbot/art_vandelay/actions/workflows/ci.yml/badge.
 
 Art Vandelay is an importer/exporter for Rails 7.0 and higher.
 
-Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help. 
+Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help.
 
 **At a high level, here’s what Art Vandelay can do:**
 
 - 🕶 Automatically [filters out sensitive information](#%EF%B8%8F-configuration).
 - 🔁 Export data [in batches](#exporting-in-batches).
-- 📧 [Email](#artvandelayexportemail_csv) exported data.
-- 📥 [Import data](#-importing) from a CSV.
+- 📧 [Email](#artvandelayexportemail) exported data.
+- 📥 [Import data](#-importing) from a CSV or JSON file.
 
 ## ✅ Installation
 
@@ -48,6 +48,8 @@ end
 
 ### 📤 Exporting
 
+Art Vandelay supports exporting CSVs and JSON files.
+
 ```ruby
 ArtVandelay::Export.new(records, export_sensitive_data: false, attributes: [], in_batches_of: ArtVandelay.in_batches_of)
 ```
@@ -57,7 +59,7 @@ ArtVandelay::Export.new(records, export_sensitive_data: false, attributes: [], i
 |`records`|An [Active Record Relation](https://api.rubyonrails.org/classes/ActiveRecord/Relation.html) or an instance of an Active Record. E.g. `User.all`, `User.first`, `User.where(...)`, `User.find_by`|
 |`export_sensitive_data`|Export sensitive data. Defaults to `false`. Can be configured with `ArtVandelay.filtered_attributes`.|
 |`attributes`|An array attributes to export. Default to all.|
-|`in_batches_of`|The number of records that will be exported into each CSV. Defaults to 10,000. Can be configured with `ArtVandelay.in_batches_of`|
+|`in_batches_of`|The number of records that will be exported into each file. Defaults to 10,000. Can be configured with `ArtVandelay.in_batches_of`|
 
 #### ArtVandelay::Export#csv
 
@@ -72,6 +74,21 @@ csv_exports = result.csv_exports
 
 csv = csv_exports.first.to_a
 # => [["id", "email", "password", "created_at", "updated_at"], ["1", "user@example.com", "[FILTERED]", "2022-10-25 09:20:28 UTC", "2022-10-25 09:20:28 UTC"]]
+```
+
+#### ArtVandelay::Export#json
+
+Returns an instance of `ArtVandelay::Export::Result`.
+
+```ruby
+result = ArtVandelay::Export.new(User.all).json
+# => #<ArtVandelay::Export::Result>
+
+json_exports = result.json_exports
+# => [#<CSV::Table>, #<CSV::Table>, ...]
+
+json = JSON.parse(json_exports.first)
+# => [{"id"=>1, "email"=>"user@example.com", "password"=>"[FILTERED]", "created_at"=>"2022-10-25 09:20:28.123Z", "updated_at"=>"2022-10-25 09:20:28.123Z"}]
 ```
 
 ##### Exporting Sensitive Data
@@ -104,12 +121,12 @@ csv_size = result.csv_exports.first.size
 # => 100
 ```
 
-#### ArtVandelay::Export#email_csv
+#### ArtVandelay::Export#email
 
-Emails the recipient(s) CSV exports as attachments.
+Emails the recipient(s) exports as attachments.
 
 ```ruby
-email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
+email(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
 ```
 
 |Argument|Description|
@@ -118,17 +135,19 @@ email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", 
 |`from`|The email address of the sender.|
 |`subject`|The email subject. Defaults to the following pattern: "User export"|
 |`body`|The email body. Defaults to the following pattern: "User export"|
+|`format`|The format of the export file. Either `:csv` or `:json`.|
 
 ```ruby
 ArtVandelay::Export
   .new(User.where.not(confirmed: nil))
-  .email_csv(
+  .email(
     to: ["george@vandelay_industries.com", "kel_varnsen@vandelay_industries.com"],
     from: "noreply@vandelay_industries.com",
     subject: "List of confirmed users",
-    body: "Here's an export of all confirmed users in our database."
+    body: "Here's an export of all confirmed users in our database.",
+    format: :json
   )
-# => ActionMailer::Base#mail: processed outbound mail in...  
+# => ActionMailer::Base#mail: processed outbound mail in...
 ```
 
 ### 📥 Importing
@@ -179,25 +198,12 @@ csv(csv_string, **options)
 |`csv_string`|Data in the form of a CSV string.|
 |`**options`|A hash of options. Available options are `headers:` and `attributes:`|
 
-#### Options
+##### Options
 
 |Option|Description|
 |------|-----------|
 |`headers:`|The CSV headers. Use when the supplied CSV string does not have headers.|
 |`attributes:`|The attributes the headers should map to. Useful if the headers do not match the model's attributes.|
-
-##### Rolling back if a record fails to save
-
-```ruby
-csv_string = CSV.generate do |csv|
-  csv << ["email", "password"]
-  csv << ["george@vandelay_industries.com", "bosco"]
-  csv << ["kel_varnsen@vandelay_industries.com", nil]
-end
-
-result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
-# => rollback transaction
-```
 
 ##### Setting headers
 
@@ -210,7 +216,60 @@ result = ArtVandelay::Import.new(:users).csv(csv_string, headers: [:email, :pass
 # => #<ArtVandelay::Import::Result>
 ```
 
-##### Mapping custom headers
+#### ArtVandelay::Import#json
+
+Imports records from the supplied JSON. Returns an instance of `ArtVandelay::Import::Result`.
+
+```ruby
+json_string = [
+  {
+    email: "george@vandelay_industries.com",
+    password: "bosco"
+  },
+  {
+    email: "kel_varnsen@vanderlay_industries.com",
+    password: nil
+  }
+].to_json
+
+result = ArtVandelay::Import.new(:users).json(json_string)
+# => #<ArtVandelay::Import::Result>
+
+result.rows_accepted
+# => [{:row=>[{"email"=>"george@vandelay_industries.com", "password"=>"bosco"}], :id=>1}]
+
+result.rows_rejected
+# => [{:row=>[{"email"=>"kel_varnsen@vandelay_industries.com", "password"=>nil}], :errors=>{:password=>["can't be blank"]}}]
+```
+
+```ruby
+json(json_string, **options)
+```
+
+##### Options
+
+|Option|Description|
+|------|-----------|
+|`attributes:`|The attributes the JSON object keys should map to. Useful if the headers do not match the model's attributes.|
+
+#### Rolling back if a record fails to save
+
+`ArtVandelay::Import.new` supports a `:rollback` keyword argument. It imports all rows as a single transaction and does not persist any records if one record fails due to an exception.
+
+```ruby
+csv_string = CSV.generate do |csv|
+  csv << ["email", "password"]
+  csv << ["george@vandelay_industries.com", "bosco"]
+  csv << ["kel_varnsen@vandelay_industries.com", nil]
+end
+
+result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+# => rollback transaction
+```
+
+#### Mapping custom headers
+
+Both `ArtVandelay::Import#csv` and `#json` support an `:attributes` keyword argument. This lets you map fields in the import document to your Active Record model's attributes.
 
 ```ruby
 csv_string = CSV.generate do |csv|
@@ -222,7 +281,9 @@ result = ArtVandelay::Import.new(:users).csv(csv_string, attributes: {email_addr
 # => #<ArtVandelay::Import::Result>
 ```
 
-##### Stripping whitespace
+#### Stripping whitespace
+
+`ArtVandelay::Import.new` supports a `:strip` keyword argument to strip whitespace from values in the import document.
 
 ```ruby
 csv_string = CSV.generate do |csv|

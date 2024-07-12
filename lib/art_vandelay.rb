@@ -16,10 +16,10 @@ module ArtVandelay
 
   class Export
     class Result
-      attr_reader :csv_exports
+      attr_reader :exports
 
-      def initialize(csv_exports)
-        @csv_exports = csv_exports
+      def initialize(exports)
+        @exports = exports
       end
     end
 
@@ -45,19 +45,42 @@ module ArtVandelay
       Result.new(csv_exports)
     end
 
-    def email_csv(to:, from: ArtVandelay.from_address, subject: "#{model_name} export", body: "#{model_name} export")
+    def json
+      json_exports = []
+
+      if records.is_a?(ActiveRecord::Relation)
+        records.in_batches(of: in_batches_of) do |relation|
+          json_exports << relation
+            .map { |record| row(record.attributes, format: :hash) }
+            .to_json
+        end
+      elsif records.is_a?(ActiveRecord::Base)
+        json_exports << [row(records.attributes, format: :hash)].to_json
+      end
+
+      Result.new(json_exports)
+    end
+
+    def email(
+      to:,
+      from: ArtVandelay.from_address,
+      subject: "#{model_name} export",
+      body: "#{model_name} export",
+      format: :csv
+    )
       if from.nil?
         raise ArtVandelay::Error, "missing keyword: :from. Alternatively, set a value on ArtVandelay.from_address"
       end
 
       mailer = ActionMailer::Base.mail(to: to, from: from, subject: subject, body: body)
-      csv_exports = csv.csv_exports
+      exports = public_send(format).exports
 
-      csv_exports.each.with_index(1) do |csv, index|
-        if csv_exports.one?
-          mailer.attachments[file_name] = csv
+      exports.each.with_index(1) do |export, index|
+        if exports.one?
+          mailer.attachments[file_name(format: format)] = export
         else
-          mailer.attachments[file_name(suffix: "-#{index}")] = csv
+          file = file_name(suffix: "-#{index}", format: format)
+          mailer.attachments[file] = export
         end
       end
 
@@ -70,18 +93,25 @@ module ArtVandelay
 
     def file_name(**options)
       options = options.symbolize_keys
+      format = options[:format]
       suffix = options[:suffix]
       prefix = model_name.downcase
       timestamp = Time.current.in_time_zone("UTC").strftime("%Y-%m-%d-%H-%M-%S-UTC")
 
-      "#{prefix}-export-#{timestamp}#{suffix}.csv"
+      "#{prefix}-export-#{timestamp}#{suffix}.#{format}"
     end
 
-    def filtered_values(attributes)
-      if export_sensitive_data
-        ActiveSupport::ParameterFilter.new([]).filter(attributes).values
-      else
-        ActiveSupport::ParameterFilter.new(ArtVandelay.filtered_attributes).filter(attributes).values
+    def filtered_values(attributes, format:)
+      attributes =
+        if export_sensitive_data
+          ActiveSupport::ParameterFilter.new([]).filter(attributes)
+        else
+          ActiveSupport::ParameterFilter.new(ArtVandelay.filtered_attributes).filter(attributes)
+        end
+
+      case format
+      when :hash then attributes
+      when :array then attributes.values
       end
     end
 
@@ -116,11 +146,11 @@ module ArtVandelay
       records.model_name.name
     end
 
-    def row(attributes)
+    def row(attributes, format: :array)
       if self.attributes.any?
-        filtered_values(attributes.slice(*standardized_attributes))
+        filtered_values(attributes.slice(*standardized_attributes), format:)
       else
-        filtered_values(attributes)
+        filtered_values(attributes, format:)
       end
     end
 
@@ -163,6 +193,20 @@ module ArtVandelay
       end
     end
 
+    def json(json_string, **options)
+      options = options.symbolize_keys
+      attributes = options[:attributes] || {}
+      array = JSON.parse(json_string)
+
+      if rollback
+        active_record.transaction do
+          parse_json_data(array, attributes, raise_on_error: true)
+        end
+      else
+        parse_json_data(array, attributes)
+      end
+    end
+
     private
 
     attr_reader :model_name, :rollback, :strip
@@ -189,6 +233,24 @@ module ArtVandelay
           attributes[key] || key
         end
       end
+    end
+
+    def parse_json_data(array, attributes, **options)
+      raise_on_error = options[:raise_on_error] || false
+      result = Result.new(rows_accepted: [], rows_rejected: [])
+
+      array.each do |entry|
+        params = build_params(entry, attributes)
+        record = active_record.new(params)
+
+        if raise_on_error ? record.save! : record.save
+          result.rows_accepted << {row: entry, id: record.id}
+        else
+          result.rows_rejected << {row: entry, errors: record.errors.messages}
+        end
+      end
+
+      result
     end
 
     def parse_rows(rows, attributes, **options)

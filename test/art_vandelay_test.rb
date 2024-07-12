@@ -34,10 +34,18 @@ class ArtVandelayTest < ActiveSupport::TestCase
   class Export < ArtVandelayTest
     include ActionMailer::TestHelper
 
-    test "it returns a ArtVandelay::Export::Result instance" do
+    test "CSV files return a ArtVandelay::Export::Result instance" do
       User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all).csv
+
+      assert_instance_of ArtVandelay::Export::Result, result
+    end
+
+    test "JSON files return a ArtVandelay::Export::Result instance" do
+      User.create!(email: "user@xample.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all).json
 
       assert_instance_of ArtVandelay::Export::Result, result
     end
@@ -46,7 +54,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all).csv
-      csv = result.csv_exports.first
+      csv = result.exports.first
 
       assert_equal(
         [
@@ -58,6 +66,34 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal(
         ["id", "email", "password", "created_at", "updated_at"],
         csv.headers
+      )
+    end
+
+    test "it creates a JSON file containing the correct data" do
+      user_1 = User.create!(email: "user_1@example.com", password: "password")
+      user_2 = User.create!(email: "user_2@example.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all).json
+      json = result.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user_1.id,
+            "email" => "user_1@example.com",
+            "password" => "[FILTERED]",
+            "created_at" => user_1.created_at.iso8601(3),
+            "updated_at" => user_1.updated_at.iso8601(3)
+          },
+          {
+            "id" => user_2.id,
+            "email" => "user_2@example.com",
+            "password" => "[FILTERED]",
+            "created_at" => user_2.created_at.iso8601(3),
+            "updated_at" => user_2.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
       )
     end
 
@@ -65,7 +101,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.first).csv
-      csv = result.csv_exports.first
+      csv = result.exports.first
 
       assert_equal(
         [
@@ -80,13 +116,32 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
-    test "it controlls what data is filtered" do
+    test "it creates a JSON file when passed one record" do
+      user = User.create!(email: "user@xample.com", password: "password")
+      result = ArtVandelay::Export.new(User.first).json
+      json = result.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email.to_s,
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+    end
+
+    test "it controls what data is filtered from CSV output" do
       user = User.create!(email: "user@xample.com", password: "password")
       ArtVandelay.setup do |config|
         config.filtered_attributes << :email
       end
 
-      csv = ArtVandelay::Export.new(User.all).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all).csv.exports.first
 
       assert_equal(
         [
@@ -98,10 +153,34 @@ class ArtVandelayTest < ActiveSupport::TestCase
       ArtVandelay.filtered_attributes.delete(:email)
     end
 
-    test "it allows for unfiltered exports" do
+    test "it controls what data is filtered from JSON output" do
+      user = User.create!(email: "user@example.com", password: "password")
+      ArtVandelay.setup do |config|
+        config.filtered_attributes << :email
+      end
+
+      json = ArtVandelay::Export.new(User.all).json.exports.first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => "[FILTERED]",
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+
+      ArtVandelay.filtered_attributes.delete(:email)
+    end
+
+    test "it allows for unfiltered CSV exports" do
       user = User.create!(email: "user@xample.com", password: "password")
 
-      csv = ArtVandelay::Export.new(User.all, export_sensitive_data: true).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all, export_sensitive_data: true).csv.exports.first
 
       assert_equal(
         [
@@ -112,10 +191,31 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
-    test "it controlls what attributes are exported" do
+    test "it allows for unfiltered JSON exports" do
+      user = User.create!(email: "user@example.com", password: "password")
+      json = ArtVandelay::Export.new(User.all, export_sensitive_data: true)
+        .json
+        .exports
+        .first
+
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email,
+            "password" => "password",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json)
+      )
+    end
+
+    test "it controls what attributes are exported to CSVs" do
       user = User.create!(email: "user@xample.com", password: "password")
 
-      csv = ArtVandelay::Export.new(User.all, attributes: [:id, "email"]).csv.csv_exports.first
+      csv = ArtVandelay::Export.new(User.all, attributes: [:id, "email"]).csv.exports.first
 
       assert_equal(
         [
@@ -126,16 +226,39 @@ class ArtVandelayTest < ActiveSupport::TestCase
       )
     end
 
+    test "controls what attributes are exported to JSON" do
+      user = User.create!(email: "user@xample.com", password: "password")
+      json = ArtVandelay::Export.new(User.all, attributes: [:id, "email"])
+        .json
+        .exports
+        .first
+
+      assert_equal [{"id" => user.id, "email" => user.email}],
+        JSON.parse(json)
+    end
+
     test "it batches CSV exports" do
       User.create!(email: "one@xample.com", password: "password")
       User.create!(email: "two@xample.com", password: "password")
 
       result = ArtVandelay::Export.new(User.all, in_batches_of: 1).csv
-      csv_1 = result.csv_exports.first
-      csv_2 = result.csv_exports.last
+      csv_1 = result.exports.first
+      csv_2 = result.exports.last
 
       assert "one@example.com", csv_1.first["email"]
       assert "two@example.com", csv_2.first["email"]
+    end
+
+    test "it batches JSON exports" do
+      User.create!(email: "one@example.com", password: "password")
+      User.create!(email: "two@example.com", password: "password")
+
+      result = ArtVandelay::Export.new(User.all, in_batches_of: 1).json
+      json_1 = result.exports.first
+      json_2 = result.exports.last
+
+      assert "one@example.com", json_1.first["email"]
+      assert "two@example.com", json_2.first["email"]
     end
 
     test "it can set the default batch size" do
@@ -146,8 +269,8 @@ class ArtVandelayTest < ActiveSupport::TestCase
       end
 
       result = ArtVandelay::Export.new(User.all).csv
-      csv_1 = result.csv_exports.first
-      csv_2 = result.csv_exports.last
+      csv_1 = result.exports.first
+      csv_2 = result.exports.last
 
       assert "one@example.com", csv_1.first["email"]
       assert "two@example.com", csv_2.first["email"]
@@ -160,7 +283,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.all).email_csv(
+        ArtVandelay::Export.new(User.all).email(
           to: ["recipient_1@examaple.com", "recipient_2@example.com"],
           from: "sender@example.com"
         )
@@ -183,11 +306,45 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "user-export-1989-12-31-00-00-00-UTC.csv", csv.filename
     end
 
+    test "it emails a JSON file" do
+      travel_to Date.new(1989, 12, 31).beginning_of_day
+      user = User.create!(email: "user@xample.com", password: "password")
+
+      assert_emails 1 do
+        ArtVandelay::Export.new(User.all).email(
+          to: ["recipient_1@examaple.com", "recipient_2@example.com"],
+          from: "sender@example.com",
+          format: :json
+        )
+      end
+
+      email = ActionMailer::Base.deliveries.last
+      json = email.attachments.first
+
+      assert_equal(
+        ["recipient_1@examaple.com", "recipient_2@example.com"],
+        email.to
+      )
+      assert_equal(
+        [
+          {
+            "id" => user.id,
+            "email" => user.email,
+            "password" => "[FILTERED]",
+            "created_at" => user.created_at.iso8601(3),
+            "updated_at" => user.updated_at.iso8601(3)
+          }
+        ],
+        JSON.parse(json.body.raw_source)
+      )
+      assert_equal "user-export-1989-12-31-00-00-00-UTC.json", json.filename
+    end
+
     test "it requires a from address" do
       User.create!(email: "user@xample.com", password: "password")
 
       assert_raises ArtVandelay::Error do
-        ArtVandelay::Export.new(User.all).email_csv(
+        ArtVandelay::Export.new(User.all).email(
           to: ["recipient_1@examaple.com"]
         )
       end
@@ -198,7 +355,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       user = User.create!(email: "user@xample.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.first).email_csv(
+        ArtVandelay::Export.new(User.first).email(
           to: ["recipient_1@examaple.com", "recipient_2@example.com"],
           from: "sender@example.com"
         )
@@ -227,7 +384,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       User.create!(email: "two@example.com", password: "password")
 
       assert_emails 1 do
-        ArtVandelay::Export.new(User.all, in_batches_of: 1).email_csv(
+        ArtVandelay::Export.new(User.all, in_batches_of: 1).email(
           to: ["recipient_1@examaple.com"],
           from: "sender@example.com"
         )
@@ -250,7 +407,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it has a default subject" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com"
       )
@@ -262,7 +419,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it can set the subject" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com",
         subject: "CUSTOM SUBJECT"
@@ -275,7 +432,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it can set a from address" do
       User.create!(email: "user@xample.com", password: "password")
 
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "FROM@EMAIL.COM"
       )
@@ -289,7 +446,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       ArtVandelay.setup do |config|
         config.from_address = "DEFAULT@EMAIL.COM"
       end
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"]
       )
       email = ActionMailer::Base.deliveries.last
@@ -301,7 +458,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
 
     test "it has a default body" do
       User.create!(email: "user@xample.com", password: "password")
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com"
       )
@@ -312,7 +469,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
 
     test "it can set the body" do
       User.create!(email: "user@xample.com", password: "password")
-      ArtVandelay::Export.new(User.all).email_csv(
+      ArtVandelay::Export.new(User.all).email(
         to: ["recipient_1@examaple.com", "recipient_2@example.com"],
         from: "sender@example.com",
         body: "CUSTOM BODY"
@@ -344,7 +501,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it strips whitespace when strip configuration is passed" do
+    test "it imports data from a JSON string" do
+      json_string = [
+        {email: "email_1@example.com", password: "s3krit"},
+        {email: "email_2@example.com", password: "s3kure!"}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users).json(json_string)
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it strips whitespace from CSVs when strip configuration is passed" do
       csv_string = CSV.generate do |csv|
         csv << [" email ", "   password  "]
         csv << ["  email_1@example.com ", " s3krit "]
@@ -364,7 +540,26 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it sets the headers" do
+    test "it strips whitespace from JSON when strip configuration is passed" do
+      json_string = [
+        {email: "  email_1@example.com ", password: " s3krit "},
+        {email: " email_2@example.com ", password: " s3kure!  "}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import.new(:users, strip: true).json(json_string)
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it sets the CSV headers" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_1@example.com s3krit]
         csv << %w[email_2@example.com s3kure!]
@@ -383,7 +578,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "maps to custom headers" do
+    test "it maps CSV headers to Active Record attributes" do
       csv_string = CSV.generate do |csv|
         csv << %w[email_address passcode]
         csv << %w[email_1@example.com s3krit]
@@ -403,15 +598,19 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "strips whitespace if strip configuration is passed when using custom attributes" do
-      csv_string = CSV.generate do |csv|
-        csv << ["email_address ", "  passcode "]
-        csv << ["  email_1@example.com ", " s3krit "]
-        csv << [" email_2@example.com", "   s3kure!  "]
-      end
+    test "it maps JSON keys to Active Record attributes" do
+      json_string = [
+        {email_address: "email_1@example.com", passcode: "s3krit"},
+        {email_address: "email_2@example.com", passcode: "s3kure!"}
+      ].to_json
 
       assert_difference("User.count", 2) do
-        ArtVandelay::Import.new(:users, strip: true).csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+        ArtVandelay::Import
+          .new(:users)
+          .json(
+            json_string,
+            attributes: {:email_address => :email, "passcode" => "password"}
+          )
       end
 
       user_1 = User.find_by!(email: "email_1@example.com")
@@ -423,7 +622,53 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_equal "s3kure!", user_2.password
     end
 
-    test "it no-ops if one record fails to save" do
+    test "strips whitespace from CSVs if strip configuration is passed when using custom attributes" do
+      csv_string = CSV.generate do |csv|
+        csv << ["email_address ", "  passcode "]
+        csv << ["  email_1@example.com ", " s3krit "]
+        csv << [" email_2@example.com", "   s3kure!  "]
+      end
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import
+          .new(:users, strip: true)
+          .csv(csv_string, attributes: {:email_address => :email, "passcode" => "password"})
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "strips whitespace from JSON if the strip configuration is passed when using custom attributes" do
+      json_string = [
+        {email_address: "  email_1@example.com ", passcode: " s3krit "},
+        {email_address: " email_2@example.com", passcode: "   s3kure!  "}
+      ].to_json
+
+      assert_difference("User.count", 2) do
+        ArtVandelay::Import
+          .new(:users, strip: true)
+          .json(
+            json_string,
+            attributes: {:email_address => :email, "passcode" => "password"}
+          )
+      end
+
+      user_1 = User.find_by!(email: "email_1@example.com")
+      user_2 = User.find_by!(email: "email_2@example.com")
+
+      assert_equal "email_1@example.com", user_1.email
+      assert_equal "s3krit", user_1.password
+      assert_equal "email_2@example.com", user_2.email
+      assert_equal "s3kure!", user_2.password
+    end
+
+    test "it no-ops if one record fails to save and 'rollback' is enabled" do
       csv_string = CSV.generate do |csv|
         csv << %w[email password]
         csv << %w[valid@example.com s3kure!]
@@ -431,9 +676,21 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid@example.com s3kure!]
       end
 
+      json_string = [
+        {email: "valid@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
       assert_no_difference("User.count") do
         assert_raises ActiveRecord::RecordInvalid do
           ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+        end
+      end
+
+      assert_no_difference("User.count") do
+        assert_raises ActiveRecord::RecordInvalid do
+          ArtVandelay::Import.new(:users, rollback: true).json(json_string)
         end
       end
     end
@@ -449,6 +706,16 @@ class ArtVandelayTest < ActiveSupport::TestCase
       assert_difference("User.count", 2) do
         ArtVandelay::Import.new(:users).csv(csv_string)
       end
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
+      assert_difference("User.count", 1) do
+        ArtVandelay::Import.new(:users).json(json_string)
+      end
     end
 
     test "returns results" do
@@ -459,7 +726,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid_2@example.com s3krit]
       end
 
-      result = ArtVandelay::Import.new(:users).csv(csv_string)
+      csv_result = ArtVandelay::Import.new(:users).csv(csv_string)
 
       assert_equal(
         [
@@ -472,14 +739,46 @@ class ArtVandelayTest < ActiveSupport::TestCase
             id: User.find_by!(email: "valid_2@example.com").id
           }
         ],
-        result.rows_accepted
+        csv_result.rows_accepted
       )
       assert_equal(
         [
           row: ["invalid@example.com", nil],
           errors: {password: [I18n.t("errors.messages.blank")]}
         ],
-        result.rows_rejected
+        csv_result.rows_rejected
+      )
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"},
+        {email: "invalid@example.com"},
+        {email: "invalid2@example.com", password: nil}
+      ].to_json
+
+      json_result = ArtVandelay::Import.new(:users).json(json_string)
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "valid_3@example.com", "password" => "s3kure!"},
+            id: User.find_by!(email: "valid_3@example.com").id
+          }
+        ],
+        json_result.rows_accepted
+      )
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "invalid@example.com"},
+            errors: {password: [I18n.t("errors.messages.blank")]}
+          },
+          {
+            row: {"email" => "invalid2@example.com", "password" => nil},
+            errors: {password: [I18n.t("errors.messages.blank")]}
+          }
+        ],
+        json_result.rows_rejected
       )
     end
 
@@ -490,7 +789,7 @@ class ArtVandelayTest < ActiveSupport::TestCase
         csv << %w[valid_2@example.com s3krit]
       end
 
-      result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
+      csv_result = ArtVandelay::Import.new(:users, rollback: true).csv(csv_string)
 
       assert_equal(
         [
@@ -503,9 +802,27 @@ class ArtVandelayTest < ActiveSupport::TestCase
             id: User.find_by!(email: "valid_2@example.com").id
           }
         ],
-        result.rows_accepted
+        csv_result.rows_accepted
       )
-      assert_empty result.rows_rejected
+      assert_empty csv_result.rows_rejected
+
+      json_string = [
+        {email: "valid_3@example.com", password: "s3kure!"}
+      ].to_json
+
+      json_result =
+        ArtVandelay::Import.new(:users, rollback: true).json(json_string)
+
+      assert_equal(
+        [
+          {
+            row: {"email" => "valid_3@example.com", "password" => "s3kure!"},
+            id: User.find_by!(email: "valid_3@example.com").id
+          }
+        ],
+        json_result.rows_accepted
+      )
+      assert_empty json_result.rows_rejected
     end
 
     test "it updates existing records" do
