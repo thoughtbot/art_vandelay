@@ -6,6 +6,14 @@ class ArtVandelayTest < ActiveSupport::TestCase
     test "it has a version number" do
       assert ArtVandelay::VERSION
     end
+
+    test "it has a supported Rails version" do
+      assert_equal ">= 7.0", ArtVandelay::RAILS_VERSION
+    end
+
+    test "it has a supported Ruby version" do
+      assert_equal ">= 3.1", ArtVandelay::MINIMUM_RUBY_VERSION
+    end
   end
 
   class Setup < ArtVandelayTest

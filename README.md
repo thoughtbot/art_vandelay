@@ -2,7 +2,7 @@
 [![GitHub Actions
 Demo](https://github.com/thoughtbot/art_vandelay/actions/workflows/ci.yml/badge.svg)](https://github.com/thoughtbot/art_vandelay/actions/workflows/ci.yml)
 
-Art Vandelay is an importer/exporter for Rails 6.0 and higher.
+Art Vandelay is an importer/exporter for Rails 7.0 and higher.
 
 Have you ever been on a project where, out of nowhere, someone asks you to send them a CSV of data? You think to yourself, “Ok, cool. No big deal. Just gimme five minutes”, but then that five minutes turns into a few hours. Art Vandelay can help. 
 
